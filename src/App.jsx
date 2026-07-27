@@ -29,6 +29,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [todayCount, setTodayCount] = useState(0);
+  const [cashbackPercent, setCashbackPercent] = useState(1.5);
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -36,6 +37,7 @@ export default function App() {
   const [qrTokenId, setQrTokenId] = useState('');
   const [modalAmount, setModalAmount] = useState(0);
   const [modalType, setModalType] = useState('cashback');
+  const [modalPercent, setModalPercent] = useState(1.5);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [copied, setCopied] = useState(false);
 
@@ -142,8 +144,8 @@ export default function App() {
       if (insertError) throw insertError;
 
       // 3. Construct QR code data string
-      // Format: KESHBAK|<uuid>|<type>|<amount>
-      const qrData = `KESHBAK|${uuid}|${activeTab}|${numericAmount}`;
+      // Format: KESHBAK|<uuid>|<type>|<amount>|<percent>
+      const qrData = `KESHBAK|${uuid}|${activeTab}|${numericAmount}|${cashbackPercent}`;
       const encodedData = encodeURIComponent(qrData);
       const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodedData}`;
 
@@ -152,6 +154,7 @@ export default function App() {
       setQrCodeUrl(url);
       setModalAmount(numericAmount);
       setModalType(activeTab);
+      setModalPercent(cashbackPercent);
       setTimeLeft(300); // 5 minutes reset
       setShowModal(true);
       setCopied(false);
@@ -174,7 +177,7 @@ export default function App() {
   };
 
   const copyQrLink = () => {
-    const rawQrData = `KESHBAK|${qrTokenId}|${modalType}|${modalAmount}`;
+    const rawQrData = `KESHBAK|${qrTokenId}|${modalType}|${modalAmount}|${modalPercent}`;
     navigator.clipboard.writeText(rawQrData);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -196,11 +199,39 @@ export default function App() {
         setError={setError} 
       />
 
+      {/* Percentage Selector (only visible in cashback mode) */}
+      {activeTab === 'cashback' && (
+        <div className="px-4 pt-1 pb-2 flex flex-col gap-1.5 w-full">
+          <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider ml-1">
+            Keshbek Foizi
+          </label>
+          <div className="relative">
+            <select
+              value={cashbackPercent}
+              onChange={(e) => setCashbackPercent(parseFloat(e.target.value))}
+              className="w-full py-2.5 px-4 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl font-bold text-sm appearance-none outline-none focus:border-[#0f7b4c] focus:bg-white transition-all cursor-pointer shadow-sm"
+            >
+              {Array.from({ length: 100 }, (_, i) => Number(((i + 1) * 0.1).toFixed(1))).map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}% keshbek
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DisplayScreen Component */}
       <DisplayScreen 
         activeTab={activeTab} 
         amountStr={amountStr} 
         error={error} 
+        cashbackPercent={cashbackPercent}
       />
 
       {/* Numpad Component */}
@@ -231,6 +262,7 @@ export default function App() {
         copied={copied}
         onCopy={copyQrLink}
         onClose={handleCloseModal}
+        modalPercent={modalPercent}
       />
       
     </div>

@@ -25,7 +25,8 @@ export default function QrModal({
   timeLeft,
   copied,
   onCopy,
-  onClose
+  onClose,
+  modalPercent = 1.5
 }) {
   if (!showModal) return null;
 
@@ -76,7 +77,7 @@ export default function QrModal({
               : 'bg-amber-50 text-amber-700 border border-amber-100'
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${modalType === 'cashback' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-            {modalType === 'cashback' ? 'Cashback berish (5%)' : 'Balansdan yechish'}
+            {modalType === 'cashback' ? `Cashback berish (${modalPercent}%)` : 'Balansdan yechish'}
           </span>
         </div>
 

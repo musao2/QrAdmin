@@ -1,6 +1,6 @@
 import { FiAlertTriangle } from 'react-icons/fi';
 
-export default function DisplayScreen({ activeTab, amountStr, error }) {
+export default function DisplayScreen({ activeTab, amountStr, error, cashbackPercent = 1.5 }) {
   const formatDisplayAmount = (numStr) => {
     if (!numStr || numStr === '0') return '0';
     return numStr.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -20,7 +20,7 @@ export default function DisplayScreen({ activeTab, amountStr, error }) {
         </div>
         {activeTab === 'cashback' && amountStr !== '0' && (
           <span className="text-[11px] font-medium text-emerald-700 bg-emerald-100/50 py-0.5 px-2 rounded-full mt-2.5 animate-fade-in">
-            Mijoz keshbeki: +{formatDisplayAmount(String(Math.floor(parseInt(amountStr, 10) * 0.05)))} UZS (5%)
+            Mijoz keshbeki: +{formatDisplayAmount(String(Math.floor(parseInt(amountStr, 10) * (cashbackPercent / 100))))} UZS ({cashbackPercent}%)
           </span>
         )}
       </div>
