@@ -26,7 +26,8 @@ export default function QrModal({
   copied,
   onCopy,
   onClose,
-  modalPercent = 1.5
+  modalPercent = 1.5,
+  isUsed = false
 }) {
   if (!showModal) return null;
 
@@ -66,7 +67,7 @@ export default function QrModal({
         </div>
 
         <h3 className="text-base font-bold text-slate-800 tracking-tight text-center">
-          QR-kod muvaffaqiyatli yaratildi
+          {isUsed ? "To'lov muvaffaqiyatli bajarildi!" : "QR-kod muvaffaqiyatli yaratildi"}
         </h3>
         
         {/* Dynamic Type Badge */}
@@ -89,7 +90,7 @@ export default function QrModal({
           <span className="text-sm font-bold text-slate-500 ml-1.5">UZS</span>
         </div>
 
-        {/* QR Code Container */}
+        {/* QR Code / Used Status Container */}
         <div className="my-6 relative p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center shadow-inner group">
           {/* Dynamic QR Guide Corners */}
           <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-[#0f7b4c]"></div>
@@ -97,15 +98,25 @@ export default function QrModal({
           <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-[#0f7b4c]"></div>
           <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-[#0f7b4c]"></div>
           
-          <img
-            src={qrCodeUrl}
-            alt="Scan KeshBak QR Code"
-            className={`w-[200px] h-[200px] rounded-lg bg-white select-none transition-all duration-300 ${
-              timeLeft <= 0 ? 'opacity-20 blur-xs grayscale' : 'opacity-100'
-            }`}
-          />
+          {isUsed ? (
+            <div className="w-[200px] h-[200px] rounded-xl bg-emerald-50 border-2 border-emerald-500 flex flex-col items-center justify-center p-4 text-center animate-fade-in shadow-inner">
+              <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-3 shadow-lg shadow-emerald-500/30 animate-bounce">
+                <FiCheckCircle className="w-10 h-10 stroke-[2.5]" />
+              </div>
+              <span className="text-2xl font-black text-emerald-700 tracking-wider uppercase">O'TILDI</span>
+              <span className="text-[11px] font-bold text-emerald-600/80 mt-1">Muvaffaqiyatli skanerlandi</span>
+            </div>
+          ) : (
+            <img
+              src={qrCodeUrl}
+              alt="Scan KeshBak QR Code"
+              className={`w-[200px] h-[200px] rounded-lg bg-white select-none transition-all duration-300 ${
+                timeLeft <= 0 ? 'opacity-20 blur-xs grayscale' : 'opacity-100'
+              }`}
+            />
+          )}
 
-          {timeLeft <= 0 && (
+          {!isUsed && timeLeft <= 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
               <FiAlertTriangle className="w-8 h-8 text-red-500 mb-2 animate-bounce" />
               <p className="text-xs font-bold text-red-600 uppercase">QR muddati tugadi</p>
@@ -114,8 +125,13 @@ export default function QrModal({
           )}
         </div>
 
-        {/* Countdown / Timer Display */}
-        {timeLeft > 0 ? (
+        {/* Countdown / Timer / Status Display */}
+        {isUsed ? (
+          <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-bold bg-emerald-50 py-1.5 px-4 rounded-full border border-emerald-200 select-none">
+            <FiCheckCircle className="w-4 h-4 text-emerald-600" />
+            <span>O'tildi (Mijoz skaner qildi)</span>
+          </div>
+        ) : timeLeft > 0 ? (
           <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium bg-slate-50 py-1.5 px-3.5 rounded-full border border-slate-100 select-none">
             <FiClock className="w-3.5 h-3.5 text-emerald-600 animate-spin-slow" />
             <span>Amal qilish muddati:</span>

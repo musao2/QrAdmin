@@ -29,7 +29,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [todayCount, setTodayCount] = useState(0);
-  const [cashbackPercent, setCashbackPercent] = useState(1.5);
+  const [cashbackPercent, setCashbackPercent] = useState(5.0);
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -37,9 +37,112 @@ export default function App() {
   const [qrTokenId, setQrTokenId] = useState('');
   const [modalAmount, setModalAmount] = useState(0);
   const [modalType, setModalType] = useState('cashback');
-  const [modalPercent, setModalPercent] = useState(1.5);
+  const [modalPercent, setModalPercent] = useState(5.0);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [copied, setCopied] = useState(false);
+  const [isUsed, setIsUsed] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Realtime & Polling listener for the generated QR token's used status
+  useEffect(() => {
+    if (!showModal || !qrTokenId) {
+      setIsUsed(false);
+      return;
+    }
+
+    const handleUsedToken = () => {
+      setIsUsed(true);
+      setSuccessMessage("✅ QR-kod mijoz tomonidan skanerlandi va ishlatildi!");
+
+      // 2 soniyadan keyin modalni avtomatik yopish
+      setTimeout(() => {
+        setShowModal(false);
+        setAmountStr('0');
+        setQrCodeUrl('');
+        setQrTokenId('');
+      }, 2000);
+
+      // 5 soniyadan keyin habarni tozalash
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 5000);
+    };
+
+    const checkStatus = async () => {
+      try {
+        const { data } = await supabase
+          .from('qr_tokens')
+          .select('used')
+          .eq('id', qrTokenId)
+          .maybeSingle();
+        if ((!data || data?.used) && !isUsed) {
+          handleUsedToken();
+        }
+      } catch (err) {
+        console.error("qr_tokens tekshirishda xatolik:", err);
+      }
+    };
+
+    const interval = setInterval(checkStatus, 1000);
+
+    const channel = supabase
+      .channel(`qr_token_${qrTokenId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'qr_tokens',
+          filter: `id=eq.${qrTokenId}`,
+        },
+        (payload) => {
+          if ((payload.eventType === 'DELETE' || (payload.new && payload.new.used)) && !isUsed) {
+            handleUsedToken();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [showModal, qrTokenId, isUsed]);
+
+  // Fetch cashback percent from station_settings with Realtime
+  useEffect(() => {
+    const fetchPercent = async () => {
+      try {
+        const { data } = await supabase
+          .from('station_settings')
+          .select('cashback_percent')
+          .eq('id', 'main')
+          .single();
+        if (data?.cashback_percent) {
+          setCashbackPercent(parseFloat(data.cashback_percent));
+        }
+      } catch (err) {
+        console.error("Keshbek foizini yuklashda xatolik:", err);
+      }
+    };
+
+    fetchPercent();
+
+    const channel = supabase
+      .channel('operator_percent')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'station_settings' },
+        () => {
+          fetchPercent();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Fetch count of today's generated QRs on load
   useEffect(() => {
@@ -192,6 +295,13 @@ export default function App() {
       {/* Header Component */}
       <Header todayCount={todayCount} />
 
+      {/* Success Notification Banner */}
+      {successMessage && (
+        <div className="mx-4 mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center justify-center gap-2 shadow-md animate-bounce">
+          <span>{successMessage}</span>
+        </div>
+      )}
+
       {/* TabSwitcher Component */}
       <TabSwitcher 
         activeTab={activeTab} 
@@ -199,29 +309,12 @@ export default function App() {
         setError={setError} 
       />
 
-      {/* Percentage Selector (only visible in cashback mode) */}
+      {/* Read-Only Cashback Percent Badge (only visible in cashback mode) */}
       {activeTab === 'cashback' && (
-        <div className="px-4 pt-1 pb-2 flex flex-col gap-1.5 w-full">
-          <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider ml-1">
-            Keshbek Foizi
-          </label>
-          <div className="relative">
-            <select
-              value={cashbackPercent}
-              onChange={(e) => setCashbackPercent(parseFloat(e.target.value))}
-              className="w-full py-2.5 px-4 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl font-bold text-sm appearance-none outline-none focus:border-[#0f7b4c] focus:bg-white transition-all cursor-pointer shadow-sm"
-            >
-              {Array.from({ length: 100 }, (_, i) => Number(((i + 1) * 0.1).toFixed(1))).map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}% keshbek
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-              </svg>
-            </div>
+        <div className="px-4 pt-2 pb-1 flex justify-center w-full">
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold py-1.5 px-3.5 rounded-full flex items-center gap-1.5 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Joriy Keshbek Foizi: <strong className="font-extrabold text-[#0f7b4c]">{cashbackPercent}%</strong> <span className="text-[10px] text-emerald-600 font-normal">(Super Admin bo'yicha)</span></span>
           </div>
         </div>
       )}
@@ -263,6 +356,7 @@ export default function App() {
         onCopy={copyQrLink}
         onClose={handleCloseModal}
         modalPercent={modalPercent}
+        isUsed={isUsed}
       />
       
     </div>
