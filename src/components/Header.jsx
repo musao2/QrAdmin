@@ -1,6 +1,6 @@
-import { FiTrendingUp } from 'react-icons/fi';
+import { FiTrendingUp, FiLock, FiUnlock } from 'react-icons/fi';
 
-export default function Header({ todayCount }) {
+export default function Header({ todayCount, isLocked, onToggleLock }) {
   return (
     <div className="px-5 pt-4 pb-2 bg-white">
       <div className="flex items-center justify-between">
@@ -17,13 +17,32 @@ export default function Header({ todayCount }) {
           </div>
         </div>
         
-        {/* Today's QRs generated stats */}
-        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 py-1 px-2.5 rounded-full shadow-sm text-slate-600">
-          <FiTrendingUp className="w-3 h-3 text-emerald-600" />
-          <span className="text-[10px] font-medium tracking-tight">Bugun:</span>
-          <span className="text-xs font-bold text-slate-800">{todayCount} ta</span>
+        {/* Header Action Controls */}
+        <div className="flex items-center gap-2">
+          {/* Lock Button Icon */}
+          <button
+            type="button"
+            onClick={onToggleLock}
+            title={isLocked ? "Ochish (PIN kodi)" : "Qulflash"}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border active:scale-95 ${
+              isLocked
+                ? 'bg-rose-50 border-rose-200 text-rose-600 shadow-sm'
+                : 'bg-slate-50 hover:bg-emerald-50 border-slate-200/80 hover:border-emerald-300 text-slate-600 hover:text-[#0f7b4c] shadow-xs'
+            }`}
+          >
+            {isLocked ? <FiLock className="w-4 h-4 text-rose-600" /> : <FiUnlock className="w-4 h-4" />}
+          </button>
+
+          {/* Today Count Badge */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 py-1 px-2.5 rounded-full shadow-sm text-slate-600">
+            <FiTrendingUp className="w-3 h-3 text-emerald-600" />
+            <span className="text-[10px] font-medium tracking-tight">Bugun:</span>
+            <span className="text-xs font-bold text-slate-800">{todayCount} ta</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+

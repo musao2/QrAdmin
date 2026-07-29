@@ -6,6 +6,7 @@ import TabSwitcher from './components/TabSwitcher';
 import DisplayScreen from './components/DisplayScreen';
 import Numpad from './components/Numpad';
 import QrModal from './components/QrModal';
+import SecurityPinModal from './components/SecurityPinModal';
 
 // Custom inline QR code icon
 function QrIcon({ className }) {
@@ -42,6 +43,42 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [isUsed, setIsUsed] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Lock State & Security PIN Modal State
+  const [isLocked, setIsLocked] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+
+  // Auto-lock panel after 5 minutes (300 000 ms) of inactivity
+  useEffect(() => {
+    let inactivityTimer;
+
+    const resetInactivityTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (!isLocked) {
+        inactivityTimer = setTimeout(() => {
+          setIsLocked(true);
+        }, 5 * 60 * 1000); // 5 minutes
+      }
+    };
+
+    resetInactivityTimer();
+
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
+
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, handleActivity);
+    });
+
+    return () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, handleActivity);
+      });
+    };
+  }, [isLocked]);
 
   // Realtime & Polling listener for the generated QR token's used status
   useEffect(() => {
@@ -209,7 +246,40 @@ export default function App() {
     });
   };
 
-  const handleCreateQr = async () => {
+  const handleToggleLock = () => {
+    if (isLocked) {
+      setShowPinModal(true);
+    } else {
+      setIsLocked(true);
+    }
+  };
+
+  const handleInitiateQr = () => {
+    const numericAmount = parseInt(amountStr, 10);
+    if (!numericAmount || numericAmount <= 0) {
+      setError('Iltimos, toʻlov miqdorini kiriting');
+      return;
+    }
+
+    if (isLocked) {
+      setShowPinModal(true);
+    } else {
+      executeCreateQr();
+    }
+  };
+
+  const handlePinSuccess = () => {
+    setIsLocked(false);
+    setShowPinModal(false);
+    
+    // If an amount was set and valid, create QR after unlocking
+    const numericAmount = parseInt(amountStr, 10);
+    if (numericAmount && numericAmount > 0) {
+      executeCreateQr();
+    }
+  };
+
+  const executeCreateQr = async () => {
     const numericAmount = parseInt(amountStr, 10);
     if (!numericAmount || numericAmount <= 0) {
       setError('Iltimos, toʻlov miqdorini kiriting');
@@ -293,7 +363,11 @@ export default function App() {
       <StatusBar />
 
       {/* Header Component */}
-      <Header todayCount={todayCount} />
+      <Header 
+        todayCount={todayCount} 
+        isLocked={isLocked}
+        onToggleLock={handleToggleLock}
+      />
 
       {/* Success Notification Banner */}
       {successMessage && (
@@ -333,7 +407,7 @@ export default function App() {
       {/* Generate QR Trigger Button */}
       <div className="px-5 pb-6">
         <button
-          onClick={handleCreateQr}
+          onClick={handleInitiateQr}
           disabled={loading || amountStr === '0'}
           className={`w-full py-4 bg-[#0f7b4c] hover:bg-[#0c623d] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#0f7b4c]/30 hover:shadow-xl active:scale-[0.99] select-none cursor-pointer transition-all ${
             loading ? 'animate-pulse' : ''
@@ -357,6 +431,17 @@ export default function App() {
         onClose={handleCloseModal}
         modalPercent={modalPercent}
         isUsed={isUsed}
+      />
+
+      {/* 6-Digit Security PIN Modal */}
+      <SecurityPinModal
+        isOpen={isLocked || showPinModal}
+        onClose={() => {
+          setShowPinModal(false);
+        }}
+        onSuccess={handlePinSuccess}
+        title={isLocked ? "Kassa Panel Qulflangan" : "Xavfsizlik Kodi (PIN)"}
+        description={isLocked ? "Panelni ochish uchun 6 xonali maxfiy PIN-kodni kiriting." : "QR-kod yaratish uchun 6 xonali maxfiy PIN-kodni kiriting."}
       />
       
     </div>
