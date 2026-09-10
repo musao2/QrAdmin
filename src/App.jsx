@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
+import { fetchCashbackPercent, fetchTodayQrCount, createQrToken, checkQrTokenStatus } from './lib/api';
 import StatusBar from './components/StatusBar';
 import Header from './components/Header';
 import TabSwitcher from './components/TabSwitcher';
@@ -7,6 +7,7 @@ import DisplayScreen from './components/DisplayScreen';
 import Numpad from './components/Numpad';
 import QrModal from './components/QrModal';
 import SecurityPinModal from './components/SecurityPinModal';
+import Login from './components/Login';
 
 // Custom inline QR code icon
 function QrIcon({ className }) {
@@ -25,6 +26,7 @@ function QrIcon({ className }) {
 }
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_access_token'));
   const [activeTab, setActiveTab] = useState('cashback'); // 'cashback' or 'withdraw'
   const [amountStr, setAmountStr] = useState('0');
   const [loading, setLoading] = useState(false);
@@ -80,7 +82,7 @@ export default function App() {
     };
   }, [isLocked]);
 
-  // Realtime & Polling listener for the generated QR token's used status
+  // Polling listener for the generated QR token's used status
   useEffect(() => {
     if (!showModal || !qrTokenId) {
       setIsUsed(false);
@@ -105,14 +107,11 @@ export default function App() {
       }, 5000);
     };
 
+    let interval;
     const checkStatus = async () => {
       try {
-        const { data } = await supabase
-          .from('qr_tokens')
-          .select('used')
-          .eq('id', qrTokenId)
-          .maybeSingle();
-        if ((!data || data?.used) && !isUsed) {
+        const isTokenUsed = await checkQrTokenStatus(qrTokenId);
+        if (isTokenUsed && !isUsed) {
           handleUsedToken();
         }
       } catch (err) {
@@ -120,64 +119,36 @@ export default function App() {
       }
     };
 
-    const interval = setInterval(checkStatus, 1000);
-
-    const channel = supabase
-      .channel(`qr_token_${qrTokenId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'qr_tokens',
-          filter: `id=eq.${qrTokenId}`,
-        },
-        (payload) => {
-          if ((payload.eventType === 'DELETE' || (payload.new && payload.new.used)) && !isUsed) {
-            handleUsedToken();
-          }
-        }
-      )
-      .subscribe();
+    interval = setInterval(checkStatus, 2000); // Poll every 2 seconds
 
     return () => {
-      clearInterval(interval);
-      supabase.removeChannel(channel);
+      if (interval) clearInterval(interval);
     };
   }, [showModal, qrTokenId, isUsed]);
 
-  // Fetch cashback percent from station_settings with Realtime
+  // Fetch cashback percent from backend
   useEffect(() => {
     const fetchPercent = async () => {
       try {
-        const { data } = await supabase
-          .from('station_settings')
-          .select('cashback_percent')
-          .eq('id', 'main')
-          .single();
-        if (data?.cashback_percent) {
-          setCashbackPercent(parseFloat(data.cashback_percent));
-        }
+        const percent = await fetchCashbackPercent();
+        setCashbackPercent(percent);
       } catch (err) {
+        if (err.message.includes('401')) {
+          localStorage.removeItem('admin_access_token');
+          localStorage.removeItem('admin_refresh_token');
+          setIsAuthenticated(false);
+        }
         console.error("Keshbek foizini yuklashda xatolik:", err);
       }
     };
 
     fetchPercent();
 
-    const channel = supabase
-      .channel('operator_percent')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'station_settings' },
-        () => {
-          fetchPercent();
-        }
-      )
-      .subscribe();
+    // Fallback polling for live updates (adjust interval or use WebSocket/SSE in the future)
+    const interval = setInterval(fetchPercent, 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, []);
 
@@ -199,17 +170,14 @@ export default function App() {
 
   const fetchTodayCount = async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Local midnight
-      
-      const { count, error: countError } = await supabase
-        .from('qr_tokens')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today.toISOString());
-        
-      if (countError) throw countError;
-      setTodayCount(count || 0);
+      const count = await fetchTodayQrCount();
+      setTodayCount(count);
     } catch (err) {
+      if (err.message.includes('401')) {
+        localStorage.removeItem('admin_access_token');
+        localStorage.removeItem('admin_refresh_token');
+        setIsAuthenticated(false);
+      }
       console.error("Bugungi QR-kodlarni yuklashda xatolik:", err);
     }
   };
@@ -290,31 +258,12 @@ export default function App() {
     setError('');
 
     try {
-      // 1. Generate local UUID
-      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
+      // 1 & 2. Create token via API
+      const uuid = await createQrToken({
+        type: activeTab,
+        amount: numericAmount,
+        cashbackPercent: cashbackPercent
       });
-
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes expiry
-
-      // 2. Insert token into Supabase table: qr_tokens
-      const { error: insertError } = await supabase
-        .from('qr_tokens')
-        .insert([
-          {
-            id: uuid,
-            type: activeTab,
-            amount: numericAmount,
-            used: false,
-            created_at: now.toISOString(),
-            expires_at: expiresAt.toISOString()
-          }
-        ]);
-
-      if (insertError) throw insertError;
 
       // 3. Construct QR code data string
       // Format: KESHBAK|<uuid>|<type>|<amount>|<percent>
@@ -336,7 +285,12 @@ export default function App() {
       await fetchTodayCount();
     } catch (err) {
       console.error("QR yaratishda xatolik:", err);
-      setError('Kutilmagan xatolik yuz berdi. Supabase ulanishini tekshiring.');
+      if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+        localStorage.removeItem('admin_access_token');
+        localStorage.removeItem('admin_refresh_token');
+        setIsAuthenticated(false);
+      }
+      setError(err.message || 'Kutilmagan xatolik yuz berdi. Backend ulanishini tekshiring.');
     } finally {
       setLoading(false);
     }
@@ -355,6 +309,10 @@ export default function App() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="w-full flex flex-col h-full bg-white relative">
