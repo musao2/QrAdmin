@@ -67,12 +67,13 @@ async function fetchWithAuth(url, options = {}) {
  */
 export async function fetchCashbackPercent() {
   try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/station`);
-    if (response.status === 401) throw new Error('401 Unauthorized');
-    if (!response.ok) throw new Error('Network response was not ok');
-    const data = await response.json();
-    // Stansiya ma'lumotlaridan cashbackPercent ni qaytaramiz
-    return data.cashbackPercent || 5.0; 
+    // const response = await fetchWithAuth(`${API_BASE_URL}/station`);
+    // if (response.status === 401) throw new Error('401 Unauthorized');
+    // if (!response.ok) throw new Error('Network response was not ok');
+    // const data = await response.json();
+    // // Stansiya ma'lumotlaridan cashbackPercent ni qaytaramiz
+    // return data.cashbackPercent || 5.0; 
+    return 5.0;
   } catch (err) {
     if (err.message.includes('401')) throw err;
     console.error('fetchCashbackPercent xatolik:', err);
@@ -86,12 +87,13 @@ export async function fetchCashbackPercent() {
  */
 export async function fetchTodayQrCount() {
   try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/admin/dashboard/stats`);
-    if (response.status === 401) throw new Error('401 Unauthorized');
-    if (!response.ok) return 0;
-    const data = await response.json();
-    // Aytaylik, stats ichida todayQrCount qaytadi (agar yo'q bo'lsa 0)
-    return data.todayQrCount || 0;
+    // const response = await fetchWithAuth(`${API_BASE_URL}/admin/dashboard/stats`);
+    // if (response.status === 401) throw new Error('401 Unauthorized');
+    // if (!response.ok) return 0;
+    // const data = await response.json();
+    // // Aytaylik, stats ichida todayQrCount qaytadi (agar yo'q bo'lsa 0)
+    // return data.todayQrCount || 0;
+    return 0;
   } catch (err) {
     if (err.message.includes('401')) throw err;
     console.error('fetchTodayQrCount xatolik:', err);
