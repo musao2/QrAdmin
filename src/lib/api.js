@@ -1,5 +1,5 @@
 // API Service File
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api-keshbek.72-62-0-138.sslip.io/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Odatda login qilingandan so'ng token localStorage'da saqlanadi
 function getAuthHeaders() {
@@ -119,15 +119,17 @@ export async function createQrToken({ type, amount, cashbackPercent }) {
     })
   });
 
-  if (!response.ok) {
-    if (response.status === 401) throw new Error('401 Unauthorized');
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || 'QR token yaratishda xatolik');
+  if (response.status === 401) throw new Error('401 Unauthorized');
+  
+  const body = await response.json().catch(() => ({}));
+  
+  if (!response.ok || body.success === false) {
+    const errorMessage = body.error?.message || body.message || 'QR token yaratishda xatolik';
+    throw new Error(errorMessage);
   }
 
-  const data = await response.json();
-  // Server yangi yaratilgan token ma'lumotlarini qaytaradi
-  return data.id;
+  // Server yangi yaratilgan token ma'lumotlarini to'liq qaytaradi
+  return body.data || body;
 }
 
 /**
@@ -141,12 +143,34 @@ export async function checkQrTokenStatus(tokenId) {
     if (response.status === 401) throw new Error('401 Unauthorized');
     if (!response.ok) return false;
     
-    const data = await response.json();
+    const body = await response.json();
+    const token = body.data || body;
     // Agar serverda status "USED" bo'lsa, mijoz kodni o'qitib pulni yechib olgan degani
-    return data.status === 'USED';
+    return token.status === 'USED';
   } catch (err) {
     if (err.message.includes('401')) throw err;
     console.error('checkQrTokenStatus xatolik:', err);
     return false;
   }
+}
+
+/**
+ * Admin sessiyasini yopish (Logout)
+ */
+export async function adminLogout() {
+  const refreshToken = localStorage.getItem('admin_refresh_token');
+  if (refreshToken) {
+    try {
+      await fetch(`${API_BASE_URL}/admin/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      });
+    } catch (err) {
+      console.error('Logout xatolik:', err);
+    }
+  }
+  // Mahalliy saqlangan tokenlarni tozalash
+  localStorage.removeItem('admin_access_token');
+  localStorage.removeItem('admin_refresh_token');
 }

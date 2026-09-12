@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { fetchCashbackPercent, fetchTodayQrCount, createQrToken, checkQrTokenStatus } from './lib/api';
 import StatusBar from './components/StatusBar';
 import Header from './components/Header';
@@ -36,7 +37,7 @@ export default function App() {
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [qrPayload, setQrPayload] = useState('');
   const [qrTokenId, setQrTokenId] = useState('');
   const [modalAmount, setModalAmount] = useState(0);
   const [modalType, setModalType] = useState('cashback');
@@ -45,6 +46,57 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [isUsed, setIsUsed] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  const currentQrRef = useRef({ id: '', showModal: false });
+  useEffect(() => {
+    currentQrRef.current = { id: qrTokenId, showModal };
+  }, [qrTokenId, showModal]);
+
+  // Socket.IO integration
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    // We assume VITE_API_BASE_URL is like http://localhost:3021/api/v1
+    const baseURL = import.meta.env.VITE_API_BASE_URL || '';
+    const socketURL = baseURL.replace(/\/api\/v1\/?$/, '') || 'http://localhost:3021';
+    
+    const token = localStorage.getItem('admin_access_token');
+    if (!token) return;
+
+    const socket = io(`${socketURL}/rt`, {
+      auth: { token },
+      transports: ['websocket'],
+    });
+
+    socket.on('transaction.created', (tx) => {
+      const current = currentQrRef.current;
+      if (current.showModal && current.id && tx.qrTokenId === current.id) {
+        handleUsedToken();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [isAuthenticated]);
+
+  const handleUsedToken = () => {
+    setIsUsed(true);
+    setSuccessMessage("✅ QR-kod mijoz tomonidan skanerlandi va ishlatildi!");
+
+    // 2 soniyadan keyin modalni avtomatik yopish
+    setTimeout(() => {
+      setShowModal(false);
+      setAmountStr('0');
+      setQrPayload('');
+      setQrTokenId('');
+    }, 2000);
+
+    // 5 soniyadan keyin habarni tozalash
+    setTimeout(() => {
+      setSuccessMessage('');
+    }, 5000);
+  };
 
   // Lock State & Security PIN Modal State
   const [isLocked, setIsLocked] = useState(false);
@@ -119,7 +171,7 @@ export default function App() {
       }
     };
 
-    interval = setInterval(checkStatus, 2000); // Poll every 2 seconds
+    interval = setInterval(checkStatus, 3000); // Poll every 3 seconds as fallback
 
     return () => {
       if (interval) clearInterval(interval);
@@ -259,25 +311,27 @@ export default function App() {
 
     try {
       // 1 & 2. Create token via API
-      const uuid = await createQrToken({
+      const token = await createQrToken({
         type: activeTab,
         amount: numericAmount,
         cashbackPercent: cashbackPercent
       });
 
-      // 3. Construct QR code data string
-      // Format: KESHBAK|<uuid>|<type>|<amount>|<percent>
-      const qrData = `KESHBAK|${uuid}|${activeTab}|${numericAmount}|${cashbackPercent}`;
-      const encodedData = encodeURIComponent(qrData);
-      const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodedData}`;
-
       // 4. Update states & Open Modal
-      setQrTokenId(uuid);
-      setQrCodeUrl(url);
+      setQrTokenId(token.id);
+      setQrPayload(token.payload);
       setModalAmount(numericAmount);
       setModalType(activeTab);
       setModalPercent(cashbackPercent);
-      setTimeLeft(300); // 5 minutes reset
+      
+      // Compute correct time left based on expiresAt
+      if (token.expiresAt) {
+        const secondsLeft = Math.floor((new Date(token.expiresAt) - new Date()) / 1000);
+        setTimeLeft(secondsLeft > 0 ? secondsLeft : 300);
+      } else {
+        setTimeLeft(token.ttlSeconds || 300); // 5 minutes default
+      }
+      
       setShowModal(true);
       setCopied(false);
 
@@ -299,15 +353,16 @@ export default function App() {
   const handleCloseModal = () => {
     setShowModal(false);
     setAmountStr('0');
-    setQrCodeUrl('');
+    setQrPayload('');
     setQrTokenId('');
   };
 
   const copyQrLink = () => {
-    const rawQrData = `KESHBAK|${qrTokenId}|${modalType}|${modalAmount}|${modalPercent}`;
-    navigator.clipboard.writeText(rawQrData);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (qrPayload) {
+      navigator.clipboard.writeText(qrPayload);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   if (!isAuthenticated) {
@@ -379,7 +434,7 @@ export default function App() {
       {/* QrModal Component */}
       <QrModal 
         showModal={showModal}
-        qrCodeUrl={qrCodeUrl}
+        qrPayload={qrPayload}
         qrTokenId={qrTokenId}
         modalAmount={modalAmount}
         modalType={modalType}

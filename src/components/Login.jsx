@@ -12,7 +12,7 @@ export default function Login({ onLoginSuccess }) {
     setError('');
 
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api-keshbek.72-62-0-138.sslip.io/api/v1';
+      const baseUrl = import.meta.env.VITE_API_BASE_URL;
       const res = await fetch(`${baseUrl}/admin/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -28,7 +28,6 @@ export default function Login({ onLoginSuccess }) {
 
       const data = await res.json();
       
-      // Server javobidan tokenni qidiramiz
       const token = data.accessToken || (data.data && data.data.accessToken) || data.token || (data.data && data.data.token);
       const refreshToken = data.refreshToken || (data.data && data.data.refreshToken);
       

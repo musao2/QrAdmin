@@ -1,4 +1,5 @@
 import { FiCheckCircle, FiClock, FiAlertTriangle, FiCheck, FiCopy } from 'react-icons/fi';
+import QRCode from 'react-qr-code';
 
 // Custom inline QR code icon
 function QrIcon({ className }) {
@@ -18,7 +19,7 @@ function QrIcon({ className }) {
 
 export default function QrModal({
   showModal,
-  qrCodeUrl,
+  qrPayload,
   qrTokenId,
   modalAmount,
   modalType,
@@ -107,13 +108,14 @@ export default function QrModal({
               <span className="text-[11px] font-bold text-emerald-600/80 mt-1">Muvaffaqiyatli skanerlandi</span>
             </div>
           ) : (
-            <img
-              src={qrCodeUrl}
-              alt="Scan KeshBak QR Code"
-              className={`w-[200px] h-[200px] rounded-lg bg-white select-none transition-all duration-300 ${
-                timeLeft <= 0 ? 'opacity-20 blur-xs grayscale' : 'opacity-100'
-              }`}
-            />
+            <div className={`p-2 bg-white rounded-xl shadow-sm transition-all duration-300 ${timeLeft <= 0 ? 'opacity-20 blur-xs grayscale' : 'opacity-100'}`}>
+              <QRCode 
+                value={qrPayload || ''} 
+                size={184}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                viewBox={`0 0 256 256`}
+              />
+            </div>
           )}
 
           {!isUsed && timeLeft <= 0 && (
