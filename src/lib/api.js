@@ -67,17 +67,23 @@ async function fetchWithAuth(url, options = {}) {
  */
 export async function fetchCashbackPercent() {
   try {
-    // const response = await fetchWithAuth(`${API_BASE_URL}/station`);
-    // if (response.status === 401) throw new Error('401 Unauthorized');
-    // if (!response.ok) throw new Error('Network response was not ok');
-    // const data = await response.json();
-    // // Stansiya ma'lumotlaridan cashbackPercent ni qaytaramiz
-    // return data.cashbackPercent || 5.0; 
-    return 5.0;
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/station`);
+    if (response.status === 401) throw new Error('401 Unauthorized');
+    if (!response.ok) throw new Error('Network response was not ok');
+    
+    const body = await response.json();
+    console.log("Station response (keshbek uchun):", body);
+
+    const data = body.data || body;
+    
+    // Backenddan keshbek foizini olamiz (cashbackPercent yoki cashback_percent nomi bilan kelishi mumkin)
+    const percent = data.cashbackPercent !== undefined ? data.cashbackPercent : data.cashback_percent;
+    console.log("Qabul qilingan foiz:", percent);
+    return percent !== undefined ? percent : 0;
   } catch (err) {
-    if (err.message.includes('401')) throw err;
+    if (err.message && err.message.includes('401')) throw err;
     console.error('fetchCashbackPercent xatolik:', err);
-    return 5.0; // Fallback
+    return 0; // Fallback
   }
 }
 

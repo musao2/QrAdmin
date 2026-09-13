@@ -33,7 +33,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [todayCount, setTodayCount] = useState(0);
-  const [cashbackPercent, setCashbackPercent] = useState(5.0);
+  const [cashbackPercent, setCashbackPercent] = useState(0);
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -41,7 +41,7 @@ export default function App() {
   const [qrTokenId, setQrTokenId] = useState('');
   const [modalAmount, setModalAmount] = useState(0);
   const [modalType, setModalType] = useState('cashback');
-  const [modalPercent, setModalPercent] = useState(5.0);
+  const [modalPercent, setModalPercent] = useState(0);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [copied, setCopied] = useState(false);
   const [isUsed, setIsUsed] = useState(false);
